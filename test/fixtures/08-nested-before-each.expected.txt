@@ -1,0 +1,14 @@
+  suite
+    ✓ a
+    ✓ b
+    ✓ c
+    sub-suite
+      ✓ a
+      ✓ b
+      ✓ c
+    sub-suite 2
+      ✓ a
+      ✓ b
+      ✓ c
+
+  9 passing

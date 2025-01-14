@@ -1,0 +1,14 @@
+{
+  "name": "mini-mocha",
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "author": "wix.com",
+  "main": "src/mini-mocha.js",
+  "bin": "src/mini-mocha.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "devDependencies": {
+    "mocha": "^5.0.1"
+  }
+}
