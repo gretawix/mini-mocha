@@ -1,4 +1,5 @@
 let level = 0;
+
 const testItems = [];
 
 const indent = (level = 0) => "  ".repeat(level + 1);
@@ -22,23 +23,20 @@ const sortTests = () => {
     };
 
     let failedCount = 0;
-    const sortedTests = testItems.sort(sortByLevelAndType);
-    sortedTests.forEach((item) => {
+    testItems.sort(sortByLevelAndType);
+    testItems.forEach((item) => {
         if (item.type === "it" && !item.pass) {
             failedCount++;
             item.failedCount = failedCount;
         }
     });
-
-    return sortedTests;
 };
 
 const getTestsStats = () => {
-    const sortedTests = sortTests();
-    const passedCount = sortedTests.filter(({ type, pass }) => type === "it" && pass).length;
-    const failedCount = sortedTests.filter(({ type, pass }) => type === "it" && !pass).length;
+    const passedCount = testItems.filter(({ type, pass }) => type === "it" && pass).length;
+    const failedCount = testItems.filter(({ type, pass }) => type === "it" && !pass).length;
 
-    return { sortedTests, passedCount, failedCount };
+    return { passedCount, failedCount };
 };
 
 const logError = (item) => {
@@ -47,12 +45,12 @@ const logError = (item) => {
 };
 
 const logStats = () => {
-    const { sortedTests, passedCount, failedCount } = getTestsStats();
+    const { passedCount, failedCount } = getTestsStats();
     log(`\n${indent(level)}${passedCount} passing`);
 
     if (failedCount > 0) {
         log(`${indent(level)}${failedCount} failing\n`);
-        sortedTests.forEach((item) => {
+        testItems.forEach((item) => {
             if (item.type === "it" && !item.pass) {
                 logError(item);
             }
@@ -70,11 +68,11 @@ const runIt = (test) => {
     }
 };
 
-const runBeforeEach = (test) => {
+const runBeforeEach = (currentItTest) => {
     testItems
         .filter(({ type }) => type === "beforeEach")
         .forEach(({ fn, level }) => {
-            if (test.level === level) {
+            if (currentItTest.level >= level) {
                 fn();
             }
         });
@@ -104,6 +102,6 @@ testItems.forEach((test) => {
     }
 });
 
-const sortedTests = sortTests();
-sortedTests.forEach((item) => logDescription(item));
+sortTests();
+testItems.forEach((item) => logDescription(item));
 logStats();
