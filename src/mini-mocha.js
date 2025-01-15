@@ -1,12 +1,11 @@
-let beforeEachCallbacks = [];
 let level = 0;
-const tests = [];
+const testItems = [];
 
 const indent = (level = 0) => "  ".repeat(level + 1);
 
 const log = (text) => console.log(text);
 
-const logDescription = ({ item }) => {
+const logDescription = (item) => {
     if (item.type === "it") {
         log(`${indent(item.level)}${item.pass ? "✓" : `${item.failedCount})`} ${item.description}`);
     } else if (item.type === "describe") {
@@ -14,25 +13,30 @@ const logDescription = ({ item }) => {
     }
 };
 
-const getTestsStats = (tests) => {
+const sortTests = () => {
     const sortByLevelAndType = (a, b) => {
         if (a.level !== b.level) return a.level - b.level;
-        if (a.type === "it" && b.type === "describe") return -1;
-        if (a.type === "describe" && b.type === "it") return 1;
-        return 0;
+        const order = ["beforeEach", "it", "describe"];
+
+        return order.indexOf(a.type) - order.indexOf(b.type);
     };
 
-    const sortedTests = tests.sort(sortByLevelAndType);
-    const passedCount = tests.filter((item) => item.type === "it" && item.pass).length;
-
     let failedCount = 0;
-
+    const sortedTests = testItems.sort(sortByLevelAndType);
     sortedTests.forEach((item) => {
         if (item.type === "it" && !item.pass) {
             failedCount++;
             item.failedCount = failedCount;
         }
     });
+
+    return sortedTests;
+};
+
+const getTestsStats = () => {
+    const sortedTests = sortTests();
+    const passedCount = sortedTests.filter(({ type, pass }) => type === "it" && pass).length;
+    const failedCount = sortedTests.filter(({ type, pass }) => type === "it" && !pass).length;
 
     return { sortedTests, passedCount, failedCount };
 };
@@ -43,7 +47,7 @@ const logError = (item) => {
 };
 
 const logStats = () => {
-    const { sortedTests, passedCount, failedCount } = getTestsStats(tests);
+    const { sortedTests, passedCount, failedCount } = getTestsStats();
     log(`\n${indent(level)}${passedCount} passing`);
 
     if (failedCount > 0) {
@@ -66,29 +70,40 @@ const runIt = (test) => {
     }
 };
 
+const runBeforeEach = (test) => {
+    testItems
+        .filter(({ type }) => type === "beforeEach")
+        .forEach(({ fn, level }) => {
+            if (test.level === level) {
+                fn();
+            }
+        });
+};
+
 global.it = function (description, fn) {
-    tests.push({ type: "it", description, fn, level });
+    testItems.push({ type: "it", description, fn, level });
 };
 
 global.describe = function (suite, fn) {
-    tests.push({ type: "describe", suite, fn, level });
+    testItems.push({ type: "describe", suite, fn, level });
     level++;
     fn();
     level--;
 };
 
 global.beforeEach = function (fn) {
-    beforeEachCallbacks.push(fn);
+    testItems.push({ type: "beforeEach", fn, level });
 };
 
 require(process.argv[2]);
 
-tests.forEach((test) => {
+testItems.forEach((test) => {
     if (test.type === "it") {
-        beforeEachCallbacks.forEach((fn) => fn());
+        runBeforeEach(test);
         runIt(test);
     }
 });
 
-getTestsStats(tests).sortedTests.forEach((item) => logDescription({ item }));
+const sortedTests = sortTests();
+sortedTests.forEach((item) => logDescription(item));
 logStats();
