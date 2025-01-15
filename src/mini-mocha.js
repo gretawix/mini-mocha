@@ -1,4 +1,4 @@
-let beforeEachCallback;
+let beforeEachCallbacks = [];
 let level = 0;
 const tests = [];
 
@@ -56,14 +56,18 @@ const logStats = () => {
     }
 };
 
-global.it = function (description, fn) {
+const runIt = (test) => {
     try {
-        if (beforeEachCallback) beforeEachCallback();
-        fn();
-        tests.push({ type: "it", description, fn, level, pass: true });
+        test.fn();
+        test.pass = true;
     } catch (err) {
-        tests.push({ type: "it", description, fn, level, pass: false, errorMessage: err.toString() });
+        test.pass = false;
+        test.errorMessage = err.toString();
     }
+};
+
+global.it = function (description, fn) {
+    tests.push({ type: "it", description, fn, level });
 };
 
 global.describe = function (suite, fn) {
@@ -74,10 +78,17 @@ global.describe = function (suite, fn) {
 };
 
 global.beforeEach = function (fn) {
-    beforeEachCallback = fn;
+    beforeEachCallbacks.push(fn);
 };
 
 require(process.argv[2]);
+
+tests.forEach((test) => {
+    if (test.type === "it") {
+        beforeEachCallbacks.forEach((fn) => fn());
+        runIt(test);
+    }
+});
 
 getTestsStats(tests).sortedTests.forEach((item) => logDescription({ item }));
 logStats();
