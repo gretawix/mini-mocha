@@ -1,3 +1,23 @@
   ✓ a
+  1) b
+  suite
+    2) c
+    ✓ d
+    sub-suite
+      3) e
 
-  1 passing
+  2 passing
+  3 failing
+
+  1) b:
+
+      AssertionError [ERR_ASSERTION]: 1 == 0
+
+  2) c:
+
+      AssertionError [ERR_ASSERTION]: 1 == 0
+
+  3) e:
+
+      AssertionError [ERR_ASSERTION]: 1 == 0
+
