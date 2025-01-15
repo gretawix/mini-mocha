@@ -1,20 +1,21 @@
 let level = 0;
 const tests = [];
 
-const indent = (level) => "  ".repeat(level + 1);
+const indent = (level = 0) => "  ".repeat(level + 1);
 
 const log = (text) => console.log(text);
 
-const logDescription = ({ item, index, end } = { item }) => {
+const logDescription = ({ item, end } = { item }) => {
     if (item.type === "it") {
-        log(`${indent(item.level)}${item.pass ? "✓" : `${index + 1})`} ${item.description}${end ? end : ""}`);
+        log(`${indent(item.level)}${item.pass ? "✓" : `${item.failedCount})`} ${item.description}${end ? end : ""}`);
     } else if (item.type === "describe") {
         log(`${indent(item.level)}${item.suite}`);
     }
 };
 
 const logError = (item) => {
-    log(`\n${indent(item.level).repeat(3)}${item.errorMessage}`);
+    log(`${indent()}${`${item.failedCount})`} ${item.description}:\n`);
+    log(`${indent(2)}${item.errorMessage}\n`);
 };
 
 const getTestsStats = (tests) => {
@@ -27,7 +28,14 @@ const getTestsStats = (tests) => {
 
     const sortedTests = tests.sort(sortByLevelAndType);
     const passedCount = tests.filter((item) => item.type === "it" && item.pass).length;
-    const failedCount = tests.filter((item) => item.type === "it" && !item.pass).length;
+
+    let failedCount = 0;
+    sortedTests.forEach((item, index) => {
+        if (item.type === "it" && !item.pass) {
+            failedCount++;
+            item.failedCount = failedCount;
+        }
+    });
 
     return { sortedTests, passedCount, failedCount };
 };
@@ -54,7 +62,7 @@ const { sortedTests, passedCount, failedCount } = getTestsStats(tests);
 
 sortedTests.forEach((item, index) => {
     if (item.type === "it") {
-        logDescription({ item, index });
+        logDescription({ item });
     } else if (item.type === "describe") {
         logDescription({ item });
     }
@@ -64,9 +72,8 @@ log(`\n${indent(level)}${passedCount} passing`);
 
 if (failedCount > 0) {
     log(`${indent(level)}${failedCount} failing\n`);
-    tests.forEach((item, index) => {
+    tests.forEach((item) => {
         if (item.type === "it" && !item.pass) {
-            logDescription({ item, index, end: ":" });
             logError(item);
         }
     });
