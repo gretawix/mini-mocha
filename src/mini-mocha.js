@@ -1,3 +1,4 @@
+let beforeEachCallback;
 let level = 0;
 const tests = [];
 
@@ -5,17 +6,12 @@ const indent = (level = 0) => "  ".repeat(level + 1);
 
 const log = (text) => console.log(text);
 
-const logDescription = ({ item, end } = { item }) => {
+const logDescription = ({ item }) => {
     if (item.type === "it") {
-        log(`${indent(item.level)}${item.pass ? "✓" : `${item.failedCount})`} ${item.description}${end ? end : ""}`);
+        log(`${indent(item.level)}${item.pass ? "✓" : `${item.failedCount})`} ${item.description}`);
     } else if (item.type === "describe") {
         log(`${indent(item.level)}${item.suite}`);
     }
-};
-
-const logError = (item) => {
-    log(`${indent()}${`${item.failedCount})`} ${item.description}:\n`);
-    log(`${indent(2)}${item.errorMessage}\n`);
 };
 
 const getTestsStats = (tests) => {
@@ -30,7 +26,8 @@ const getTestsStats = (tests) => {
     const passedCount = tests.filter((item) => item.type === "it" && item.pass).length;
 
     let failedCount = 0;
-    sortedTests.forEach((item, index) => {
+
+    sortedTests.forEach((item) => {
         if (item.type === "it" && !item.pass) {
             failedCount++;
             item.failedCount = failedCount;
@@ -40,8 +37,28 @@ const getTestsStats = (tests) => {
     return { sortedTests, passedCount, failedCount };
 };
 
+const logError = (item) => {
+    log(`${indent()}${`${item.failedCount})`} ${item.description}:\n`);
+    log(`${indent(2)}${item.errorMessage}\n`);
+};
+
+const logStats = () => {
+    const { sortedTests, passedCount, failedCount } = getTestsStats(tests);
+    log(`\n${indent(level)}${passedCount} passing`);
+
+    if (failedCount > 0) {
+        log(`${indent(level)}${failedCount} failing\n`);
+        sortedTests.forEach((item) => {
+            if (item.type === "it" && !item.pass) {
+                logError(item);
+            }
+        });
+    }
+};
+
 global.it = function (description, fn) {
     try {
+        if (beforeEachCallback) beforeEachCallback();
         fn();
         tests.push({ type: "it", description, fn, level, pass: true });
     } catch (err) {
@@ -56,25 +73,11 @@ global.describe = function (suite, fn) {
     level--;
 };
 
+global.beforeEach = function (fn) {
+    beforeEachCallback = fn;
+};
+
 require(process.argv[2]);
 
-const { sortedTests, passedCount, failedCount } = getTestsStats(tests);
-
-sortedTests.forEach((item, index) => {
-    if (item.type === "it") {
-        logDescription({ item });
-    } else if (item.type === "describe") {
-        logDescription({ item });
-    }
-});
-
-log(`\n${indent(level)}${passedCount} passing`);
-
-if (failedCount > 0) {
-    log(`${indent(level)}${failedCount} failing\n`);
-    tests.forEach((item) => {
-        if (item.type === "it" && !item.pass) {
-            logError(item);
-        }
-    });
-}
+getTestsStats(tests).sortedTests.forEach((item) => logDescription({ item }));
+logStats();
