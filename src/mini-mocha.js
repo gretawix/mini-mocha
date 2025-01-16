@@ -1,107 +1,64 @@
-let level = 0;
-
 const testItems = [];
-
-const indent = (level = 0) => "  ".repeat(level + 1);
+let currentDescribe = null;
 
 const log = (text) => console.log(text);
 
-const logDescription = (item) => {
-    if (item.type === "it") {
-        log(`${indent(item.level)}${item.pass ? "✓" : `${item.failedCount})`} ${item.description}`);
-    } else if (item.type === "describe") {
-        log(`${indent(item.level)}${item.suite}`);
-    }
-};
-
-const sortTests = () => {
-    const sortByLevelAndType = (a, b) => {
-        if (a.level !== b.level) return a.level - b.level;
-        const order = ["beforeEach", "it", "describe"];
-
-        return order.indexOf(a.type) - order.indexOf(b.type);
-    };
-
-    let failedCount = 0;
-    testItems.sort(sortByLevelAndType);
-    testItems.forEach((item) => {
-        if (item.type === "it" && !item.pass) {
-            failedCount++;
-            item.failedCount = failedCount;
-        }
-    });
-};
-
-const getTestsStats = () => {
-    const passedCount = testItems.filter(({ type, pass }) => type === "it" && pass).length;
-    const failedCount = testItems.filter(({ type, pass }) => type === "it" && !pass).length;
-
-    return { passedCount, failedCount };
-};
-
-const logError = (item) => {
-    log(`${indent()}${`${item.failedCount})`} ${item.description}:\n`);
-    log(`${indent(2)}${item.errorMessage}\n`);
-};
-
-const logStats = () => {
-    const { passedCount, failedCount } = getTestsStats();
-    log(`\n${indent(level)}${passedCount} passing`);
-
-    if (failedCount > 0) {
-        log(`${indent(level)}${failedCount} failing\n`);
-        testItems.forEach((item) => {
-            if (item.type === "it" && !item.pass) {
-                logError(item);
-            }
-        });
-    }
-};
-
-const runIt = (test) => {
-    try {
-        test.fn();
-        test.pass = true;
-    } catch (err) {
-        test.pass = false;
-        test.errorMessage = err.toString();
-    }
-};
-
-const runBeforeEach = (currentItTest) => {
-    testItems
-        .filter(({ type }) => type === "beforeEach")
-        .forEach(({ fn, level }) => {
-            if (currentItTest.level >= level) {
-                fn();
-            }
-        });
-};
-
 global.it = function (description, fn) {
-    testItems.push({ type: "it", description, fn, level });
+    currentDescribe ? currentDescribe.itTests.push({ description, fn }) : testItems.push({ description, fn });
 };
 
 global.describe = function (suite, fn) {
-    testItems.push({ type: "describe", suite, fn, level });
-    level++;
+    const newDescribe = {
+        suite,
+        fn,
+        describe: [],
+        itTests: [],
+        beforeEach: [],
+    };
+    const previousDescribe = currentDescribe;
+
+    currentDescribe = newDescribe;
     fn();
-    level--;
+    previousDescribe ? previousDescribe.describe.push(newDescribe) : testItems.push(newDescribe);
+    currentDescribe = previousDescribe;
 };
 
 global.beforeEach = function (fn) {
-    testItems.push({ type: "beforeEach", fn, level });
+    currentDescribe ? currentDescribe.beforeEach.push(fn) : testItems.push(fn);
 };
 
 require(process.argv[2]);
 
-testItems.forEach((test) => {
-    if (test.type === "it") {
-        runBeforeEach(test);
-        runIt(test);
-    }
-});
+const runTests = (testItems) => {
+    const runIt = (it) => {
+        try {
+            it.fn();
+            it.pass = true;
+        } catch (err) {
+            it.pass = false;
+            it.errorMessage = err.toString();
+        }
+    };
 
-sortTests();
-testItems.forEach((item) => logDescription(item));
-logStats();
+    const executeTests = (describeBlock, parentBeforeEach = []) => {
+        const allBeforeEach = [...parentBeforeEach, ...describeBlock.beforeEach];
+
+        describeBlock.itTests.forEach((it) => {
+            allBeforeEach.forEach((fn) => fn());
+            runIt(it);
+        });
+        describeBlock.describe.forEach((describe) => executeTests(describe, allBeforeEach));
+    };
+
+    testItems.forEach((item) => {
+        if (item.describe) {
+            executeTests(item);
+        } else if (item.description) {
+            runIt(item);
+        }
+    });
+};
+
+runTests(testItems);
+
+log(JSON.stringify(testItems, null, 2));
