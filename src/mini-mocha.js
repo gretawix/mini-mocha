@@ -1,7 +1,7 @@
 const testItems = [];
 let currentDescribe = null;
-
-const log = (text) => console.log(text);
+let passedCount = 0;
+let failedTests = [];
 
 global.it = function (description, fn) {
     currentDescribe ? currentDescribe.itTests.push({ description, fn }) : testItems.push({ description, fn });
@@ -28,6 +28,10 @@ global.beforeEach = function (fn) {
 };
 
 require(process.argv[2]);
+
+const log = (text) => console.log(text);
+
+const indent = (level = 0) => "  ".repeat(level + 1);
 
 const runTests = (testItems) => {
     const runIt = (it) => {
@@ -59,6 +63,47 @@ const runTests = (testItems) => {
     });
 };
 
-runTests(testItems);
+const printLog = (testItems, level = 0) => {
+    const logItDescription = (item, level) => {
+        item.pass
+            ? passedCount++
+            : failedTests.push({ description: item.description, errorMessage: item.errorMessage });
+        log(`${indent(level)}${item.pass ? "✓" : `${failedTests.length})`} ${item.description}`);
+    };
 
-log(JSON.stringify(testItems, null, 2));
+    testItems.forEach((item) => {
+        if (!item.describe) {
+            logItDescription(item, level);
+        }
+    });
+
+    testItems.forEach((item) => {
+        if (item.describe) {
+            log(`${indent(level)}${item.suite}`);
+            level++;
+            item.itTests.forEach((test) => logItDescription(test, level));
+            printLog(item.describe, level);
+            level--;
+        }
+    });
+};
+
+const printResults = (failedTests, passedCount) => {
+    const logError = (item, index) => {
+        log(`${indent()}${`${index + 1})`} ${item.description}:\n`);
+        log(`${indent(2)}${item.errorMessage}\n`);
+    };
+
+    log(`\n${indent()}${passedCount} passing`);
+
+    if (failedTests.length > 0) {
+        log(`${indent()}${failedTests.length} failing\n`);
+        failedTests.forEach((item, index) => {
+            logError(item, index);
+        });
+    }
+};
+
+runTests(testItems);
+printLog(testItems);
+printResults(failedTests, passedCount);
