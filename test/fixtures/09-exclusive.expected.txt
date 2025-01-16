@@ -1,0 +1,8 @@
+  ✓ a
+  suite
+    ✓ c
+  suite2
+    sub-suite2
+      ✓ e2
+
+  3 passing

@@ -1,8 +1,9 @@
-const testItems = { itTests: [], describe: [], beforeEach: [] };
+let testItems = { itTests: [], describe: [], beforeEach: [] };
 let currentDescribe = null;
 let passedCount = 0;
 let failedTests = [];
 
+// global functions
 global.it = function (description, fn) {
     const test = { description, fn, only: false };
     currentDescribe ? currentDescribe.itTests.push(test) : testItems.itTests.push(test);
@@ -10,7 +11,7 @@ global.it = function (description, fn) {
 
 global.it.only = function (description, fn) {
     const test = { description, fn, only: true };
-    currentDescribe ? currentDescribe.itTests.push(test) : testItems.push(test);
+    currentDescribe ? currentDescribe.itTests.push(test) : testItems.itTests.push(test);
 };
 
 global.describe = function (suite, fn) {
@@ -20,14 +21,11 @@ global.describe = function (suite, fn) {
         describe: [],
         itTests: [],
         beforeEach: [],
-        only: false,
     };
     const previousDescribe = currentDescribe;
 
     currentDescribe = newDescribe;
     fn();
-    const hasTestsWithOnly = currentDescribe.itTests.some(({ only }) => only);
-    currentDescribe = { ...currentDescribe, only: hasTestsWithOnly };
     previousDescribe ? previousDescribe.describe.push(currentDescribe) : testItems.describe.push(currentDescribe);
     currentDescribe = previousDescribe;
 };
@@ -38,6 +36,7 @@ global.beforeEach = function (fn) {
 
 require(process.argv[2]);
 
+//local functions
 const log = (text) => console.log(text);
 
 const indent = (level = 0) => "  ".repeat(level + 1);
@@ -53,7 +52,7 @@ const runTests = (testItems) => {
             it.pass = false;
             it.errorMessage = err.toString();
         }
-        it.pass ? passedCount++ : failedTests.push({ description: it.description, errorMessage: it.errorMessage });
+        it.pass ? passedCount++ : failedTests.push(it);
         log(`${indent(level)}${it.pass ? "✓" : `${failedTests.length})`} ${it.description}`);
     };
 
@@ -76,17 +75,32 @@ const runTests = (testItems) => {
     executeTests(testItems);
 };
 
+const filterOnlyTests = (testBlock) => {
+    const itTests = testBlock.itTests.filter(({ only }) => only);
+    const describe = testBlock.describe
+        .map((item) => filterOnlyTests(item))
+        .filter((item) => item.itTests.length > 0 || item.describe.length > 0);
+
+    return { ...testBlock, itTests, describe };
+};
+
 const printResults = (failedTests, passedCount) => {
     log(`\n${indent()}${passedCount} passing`);
 
     if (failedTests.length > 0) {
         log(`${indent()}${failedTests.length} failing\n`);
-        failedTests.forEach((item, index) => {
-            log(`${indent()}${`${index + 1})`} ${item.description}:\n`);
-            log(`${indent(2)}${item.errorMessage}\n`);
+        failedTests.forEach(({ description, errorMessage }, index) => {
+            log(`${indent()}${`${index + 1})`} ${description}:\n`);
+            log(`${indent(2)}${errorMessage}\n`);
         });
     }
 };
-// log(JSON.stringify(testItems, null, 2));
+
+// test execution
+const filteredOnlyTests = filterOnlyTests(testItems);
+if (filteredOnlyTests.itTests.length || filteredOnlyTests.describe.length) {
+    testItems = filteredOnlyTests;
+}
+
 runTests(testItems);
 printResults(failedTests, passedCount);
