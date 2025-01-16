@@ -1,10 +1,16 @@
-const testItems = [];
+const testItems = { itTests: [], describe: [], beforeEach: [] };
 let currentDescribe = null;
 let passedCount = 0;
 let failedTests = [];
 
 global.it = function (description, fn) {
-    currentDescribe ? currentDescribe.itTests.push({ description, fn }) : testItems.push({ description, fn });
+    const test = { description, fn, only: false };
+    currentDescribe ? currentDescribe.itTests.push(test) : testItems.itTests.push(test);
+};
+
+global.it.only = function (description, fn) {
+    const test = { description, fn, only: true };
+    currentDescribe ? currentDescribe.itTests.push(test) : testItems.push(test);
 };
 
 global.describe = function (suite, fn) {
@@ -14,17 +20,20 @@ global.describe = function (suite, fn) {
         describe: [],
         itTests: [],
         beforeEach: [],
+        only: false,
     };
     const previousDescribe = currentDescribe;
 
     currentDescribe = newDescribe;
     fn();
-    previousDescribe ? previousDescribe.describe.push(newDescribe) : testItems.push(newDescribe);
+    const hasTestsWithOnly = currentDescribe.itTests.some(({ only }) => only);
+    currentDescribe = { ...currentDescribe, only: hasTestsWithOnly };
+    previousDescribe ? previousDescribe.describe.push(currentDescribe) : testItems.describe.push(currentDescribe);
     currentDescribe = previousDescribe;
 };
 
 global.beforeEach = function (fn) {
-    currentDescribe ? currentDescribe.beforeEach.push(fn) : testItems.push(fn);
+    currentDescribe ? currentDescribe.beforeEach.push(fn) : testItems.beforeEach.push(fn);
 };
 
 require(process.argv[2]);
@@ -34,6 +43,8 @@ const log = (text) => console.log(text);
 const indent = (level = 0) => "  ".repeat(level + 1);
 
 const runTests = (testItems) => {
+    let level = 0;
+
     const runIt = (it) => {
         try {
             it.fn();
@@ -42,68 +53,40 @@ const runTests = (testItems) => {
             it.pass = false;
             it.errorMessage = err.toString();
         }
+        it.pass ? passedCount++ : failedTests.push({ description: it.description, errorMessage: it.errorMessage });
+        log(`${indent(level)}${it.pass ? "✓" : `${failedTests.length})`} ${it.description}`);
     };
 
-    const executeTests = (describeBlock, parentBeforeEach = []) => {
-        const allBeforeEach = [...parentBeforeEach, ...describeBlock.beforeEach];
+    const executeTests = (testBlock, parentBeforeEach = []) => {
+        const allBeforeEach = [...parentBeforeEach, ...testBlock.beforeEach];
 
-        describeBlock.itTests.forEach((it) => {
+        testBlock.itTests.forEach((it) => {
             allBeforeEach.forEach((fn) => fn());
             runIt(it);
         });
-        describeBlock.describe.forEach((describe) => executeTests(describe, allBeforeEach));
-    };
 
-    testItems.forEach((item) => {
-        if (item.describe) {
-            executeTests(item);
-        } else if (item.description) {
-            runIt(item);
-        }
-    });
-};
-
-const printLog = (testItems, level = 0) => {
-    const logItDescription = (item, level) => {
-        item.pass
-            ? passedCount++
-            : failedTests.push({ description: item.description, errorMessage: item.errorMessage });
-        log(`${indent(level)}${item.pass ? "✓" : `${failedTests.length})`} ${item.description}`);
-    };
-
-    testItems.forEach((item) => {
-        if (!item.describe) {
-            logItDescription(item, level);
-        }
-    });
-
-    testItems.forEach((item) => {
-        if (item.describe) {
-            log(`${indent(level)}${item.suite}`);
+        testBlock.describe.forEach((describe) => {
+            log(`${indent(level)}${describe.suite}`);
             level++;
-            item.itTests.forEach((test) => logItDescription(test, level));
-            printLog(item.describe, level);
+            executeTests(describe, allBeforeEach);
             level--;
-        }
-    });
+        });
+    };
+
+    executeTests(testItems);
 };
 
 const printResults = (failedTests, passedCount) => {
-    const logError = (item, index) => {
-        log(`${indent()}${`${index + 1})`} ${item.description}:\n`);
-        log(`${indent(2)}${item.errorMessage}\n`);
-    };
-
     log(`\n${indent()}${passedCount} passing`);
 
     if (failedTests.length > 0) {
         log(`${indent()}${failedTests.length} failing\n`);
         failedTests.forEach((item, index) => {
-            logError(item, index);
+            log(`${indent()}${`${index + 1})`} ${item.description}:\n`);
+            log(`${indent(2)}${item.errorMessage}\n`);
         });
     }
 };
-
+// log(JSON.stringify(testItems, null, 2));
 runTests(testItems);
-printLog(testItems);
 printResults(failedTests, passedCount);
